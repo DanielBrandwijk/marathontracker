@@ -79,7 +79,15 @@ async function ensureToken() {
 }
 
 export async function sendCode(addr) {
-  await call('/auth/v1/otp', { method: 'POST', body: { email: addr, create_user: true } });
+  // De link in de mail brengt je terug naar precies deze app.
+  const back = encodeURIComponent(location.origin + location.pathname);
+  try {
+    await call('/auth/v1/otp?redirect_to=' + back, { method: 'POST', body: { email: addr, create_user: false } });
+  } catch (e) {
+    if (e.status === 429) e.message = 'Er zijn te veel inlogmails verstuurd. Wacht een uur en probeer het dan één keer.';
+    else if (e.status === 422 || /signups? not allowed|not found|gesloten/i.test(e.message)) e.message = 'Dit e-mailadres heeft geen toegang.';
+    throw e;
+  }
 }
 export async function verifyCode(addr, code) {
   const j = await call('/auth/v1/verify', { method: 'POST', body: { type: 'email', email: addr, token: String(code).replace(/\s/g, '') } });

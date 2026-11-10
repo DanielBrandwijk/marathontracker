@@ -1,0 +1,18 @@
+# Een gratis Supabase-project wordt gepauzeerd na 7 dagen zonder gebruik.
+# Deze taak klopt elke 3 dagen even aan, zodat dat niet gebeurt.
+on:
+  schedule:
+    - cron: '17 6 */3 * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Aankloppen bij Supabase
+        run: |
+          URL=$(grep -oP "supabaseUrl:\s*'\K[^']+" config.js || true)
+          KEY=$(grep -oP "supabaseAnonKey:\s*'\K[^']+" config.js || true)
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then echo "config.js is nog niet ingevuld"; exit 0; fi
+          curl -s -o /dev/null -w "Antwoord: %{http_code}\n" "$URL/rest/v1/entries?select=id&limit=1" -H "apikey: $KEY"

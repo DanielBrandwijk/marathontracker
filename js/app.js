@@ -444,15 +444,24 @@ function openWeekForm(id) {
 }
 
 // ---------- Voortgang ----------
+// Grafieken beginnen eind augustus; weken vóór het schema hebben geen planning.
+const HISTORY_START = '2026-08-24';
 function weekSeries(all, today) {
-  return plan.weeks().map((w, i) => {
+  const planned = plan.weeks();
+  const first = planned.length ? planned[0].start : plan.PLAN_START;
+  const hist = [];
+  for (let d = HISTORY_START; d < first; d = addDays(d, 7)) hist.push({ id: 'hist-' + d, start: d, lang: 0, gym: 0, history: true });
+  let n = 0;
+  return hist.concat(planned).map((w, i) => {
     const list = plan.actsInWeek(all, w.start);
     const st = plan.stats(list);
     const easy = list.filter((a) => a.category === 'run' && a.distanceKm && a.durationSec && !['Interval', 'Wedstrijd', 'Tempoloop'].includes(a.type));
     const eKm = easy.reduce((s, a) => s + a.distanceKm, 0), eSec = easy.reduce((s, a) => s + a.durationSec, 0);
-    return { w, i, st, past: w.start <= today, current: today >= w.start && today <= plan.weekEnd(w), pace: eKm ? eSec / eKm : null };
+    const name = w.history ? 'Voor het schema' : 'Week ' + (++n);
+    return { w, i, name, st, past: w.start <= today, current: today >= w.start && today <= plan.weekEnd(w), pace: eKm ? eSec / eKm : null };
   });
 }
+const planLine = (x, v) => (x.w.history ? '' : `\nGepland: ${fmtKm(v)} km`);
 
 let resizeTimer = null;
 function renderProgress(sub) {
@@ -493,26 +502,32 @@ function renderProgress(sub) {
     const w = el.clientWidth;
     const lbl = (x) => shortDate(x.w.start);
     el.innerHTML = charts.bars({
-      width: w, label: 'Kilometers per week', fmt: (v) => fmtKm(v, 0),
+      width: w, slot: 30, label: 'Kilometers per week', fmt: (v) => fmtKm(v, 0),
       items: series.map((x) => ({
         label: lbl(x), value: x.past ? x.st.km : 0, plan: plan.target(x.w), current: x.current,
-        tip: `Week ${x.i + 1} · ${weekRange(x.w.start)}\nGedaan: ${x.past ? fmtKm(x.st.km) + ' km' : '–'}\nGepland: ${fmtKm(plan.target(x.w))} km`
+        tip: `${x.name} · ${weekRange(x.w.start)}\nGedaan: ${x.past ? fmtKm(x.st.km) + ' km' : '–'}${planLine(x, plan.target(x.w))}`
       }))
     });
     $('#chLr').innerHTML = charts.bars({
-      width: w, label: 'Langste loop per week', fmt: (v) => fmtKm(v, 0),
+      width: w, slot: 30, label: 'Langste loop per week', fmt: (v) => fmtKm(v, 0),
       items: series.map((x) => ({
         label: lbl(x), value: x.past ? x.st.longest : 0, plan: x.w.lang, current: x.current,
-        tip: `Week ${x.i + 1} · ${weekRange(x.w.start)}\nLangste loop: ${x.past ? fmtKm(x.st.longest) + ' km' : '–'}\nGepland: ${fmtKm(x.w.lang)} km`
+        tip: `${x.name} · ${weekRange(x.w.start)}\nLangste loop: ${x.past ? fmtKm(x.st.longest) + ' km' : '–'}${planLine(x, x.w.lang)}`
       }))
     });
     const pItems = series.filter((x) => x.past);
     $('#chPace').innerHTML = charts.paceLine({
-      width: w, label: 'Tempo per week', goal: goalSec() / MARA, fmtY: fmtPace,
+      width: w, slot: 30, label: 'Tempo per week', goal: goalSec() / MARA, fmtY: fmtPace,
       items: pItems.map((x) => ({
         label: lbl(x), value: x.pace, current: x.current,
-        tip: `Week ${x.i + 1} · ${weekRange(x.w.start)}\nTempo: ${x.pace ? fmtPace(x.pace) + '/km' : 'geen rustige lopen'}`
+        tip: `${x.name} · ${weekRange(x.w.start)}\nTempo: ${x.pace ? fmtPace(x.pace) + '/km' : 'geen rustige lopen'}`
       }))
+    });
+    // Begin bij de huidige week; naar links scrollen = verder terug.
+    view.querySelectorAll('.chart-scroll').forEach((sc) => {
+      const now = sc.querySelector('.ax-now');
+      const x = now ? +now.getAttribute('x') : sc.scrollWidth;
+      sc.scrollLeft = Math.max(0, x - sc.clientWidth * 0.75);
     });
   };
   draw();
@@ -523,7 +538,7 @@ function renderProgress(sub) {
 function tableKm(series) {
   return `<details class="table"><summary>Toon als tabel</summary><div class="tbl-wrap"><table>
     <thead><tr><th>Week</th><th class="num">Gedaan</th><th class="num">Gepland</th><th class="num">Langste</th><th class="num">Sportschool</th></tr></thead><tbody>
-    ${series.map((x) => `<tr><td>${x.i + 1} · ${weekRange(x.w.start)}</td><td class="num">${x.past ? fmtKm(x.st.km) : ''}</td><td class="num">${fmtKm(plan.target(x.w))}</td><td class="num">${x.past ? fmtKm(x.st.longest) : ''}</td><td class="num">${x.past ? x.st.gymDays + '/' + x.w.gym : ''}</td></tr>`).join('')}
+    ${series.map((x) => `<tr><td>${x.w.history ? '' : x.name.replace('Week ', '') + ' · '}${weekRange(x.w.start)}</td><td class="num">${x.past ? fmtKm(x.st.km) : ''}</td><td class="num">${x.w.history ? '–' : fmtKm(plan.target(x.w))}</td><td class="num">${x.past ? fmtKm(x.st.longest) : ''}</td><td class="num">${x.past ? x.st.gymDays + (x.w.history ? '' : '/' + x.w.gym) : ''}</td></tr>`).join('')}
     </tbody></table></div></details>`;
 }
 

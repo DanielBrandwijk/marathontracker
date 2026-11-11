@@ -299,7 +299,10 @@ textarea { min-height: 90px; resize: vertical; }
 .tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); }
 .tile .v { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.15; }
 .tile .l { color: var(--ink-3); font-size: 14px; }
-.chart { width: 100%; overflow: hidden; }
+.chart { width: 100%; overflow: hidden; position: relative; }
+.chart-scroll { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+.chart-yaxis { position: absolute; left: 0; top: 0; pointer-events: none; }
+.chart-svg .axis-bg { fill: var(--surface); }
 .chart-svg { display: block; }
 .chart-svg text { font: 11px system-ui, sans-serif; fill: var(--ink-3); }
 .chart-svg .ax-now { fill: var(--ink); font-weight: 700; }
